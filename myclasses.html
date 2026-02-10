@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Class – Memora</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link href="https://fonts.googleapis.com/css?family=Manrope:700&display=swap" rel="stylesheet">
+  <link href="styles.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #1d1d1d;
+      color: #fff;
+      font-family: Manrope, sans-serif;
+    }
+
+    .page-wrap {
+      padding: 40px;
+    }
+
+    .class-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .add-deck-btn {
+      padding: 8px 14px;
+      background: #6f42ff;
+      border-radius: 10px;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: 0.15s ease;
+    }
+
+    .add-deck-btn:hover { background: #7b53ff; }
+
+    .deck-list {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .deck-item {
+      background: #2b2b2b;
+      padding: 16px;
+      border-radius: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    .deck-item:hover {
+      background: #333333;
+    }
+
+    .deck-actions button {
+      background: none;
+      border: none;
+      color: #bbbbbb;
+      cursor: pointer;
+      font-size: 1rem;
+      margin-left: 10px;
+      transition: 0.15s ease;
+    }
+
+    .deck-actions button:hover {
+      color: white;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(3px);
+    }
+    .modal-overlay.show { display: flex; }
+
+    .modal-box {
+      background: #2b2b2b;
+      padding: 22px;
+      width: 280px;
+      border-radius: 14px;
+      box-shadow: 0 6px 26px rgba(0,0,0,0.4);
+    }
+
+    .modal-box h2 {
+      margin: 0 0 14px 0;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      background: #3a3a3a;
+      border: none;
+      color: white;
+      margin-bottom: 16px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .modal-btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: #444;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
+    .modal-btn:hover { background: #555; }
+
+    .modal-btn.primary {
+      background: #6f42ff;
+    }
+    .modal-btn.primary:hover {
+      background: #7b53ff;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <main class="page-wrap">
+
+    <div class="class-title">
+      <span id="className">Class Name</span>
+      <button class="add-deck-btn" id="addDeckBtn">+</button>
+    </div>
+
+    <div id="deckList" class="deck-list"></div>
+
+  </main>
+
+  <!-- Deck Modal -->
+  <div id="deckModal" class="modal-overlay">
+    <div class="modal-box">
+      <h2 id="deckModalTitle">Add Class</h2>
+
+      <input id="deckNameInput" class="modal-input" placeholder="Deck name..." />
+
+      <div class="modal-buttons">
+        <button class="modal-btn" id="cancelDeckBtn">Cancel</button>
+        <button class="modal-btn primary" id="saveDeckBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const classNameEl = document.getElementById("className");
+    const deckListEl = document.getElementById("deckList");
+
+    const deckModal = document.getElementById("deckModal");
+    const deckNameInput = document.getElementById("deckNameInput");
+    const saveDeckBtn = document.getElementById("saveDeckBtn");
+    const cancelDeckBtn = document.getElementById("cancelDeckBtn");
+    const deckModalTitle = document.getElementById("deckModalTitle");
+
+    let currentClass = localStorage.getItem("memora_current_class");
+    let editingDeckIndex = null;
+
+    if (!currentClass) {
+      currentClass = "Unnamed Class";
+    }
+    classNameEl.textContent = currentClass;
+
+    function loadDecks() {
+      const all = JSON.parse(localStorage.getItem("memora_class_decks") || "{}");
+      return all[currentClass] || [];
+    }
+
+    function saveDecks(decks) {
+      const all = JSON.parse(localStorage.getItem("memora_class_decks") || "{}");
+      all[currentClass] = decks;
+      localStorage.setItem("memora_class_decks", JSON.stringify(all));
+    }
+
+    function renderDecks() {
+      deckListEl.innerHTML = "";
+      const decks = loadDecks();
+
+      decks.forEach((name, index) => {
+        const item = document.createElement("div");
+        item.className = "deck-item";
+        item.innerHTML = `
+          <span>${name}</span>
+          <div class="deck-actions">
+            <button class="edit-btn">✏️</button>
+            <button class="delete-btn">🗑️</button>
+          </div>
+        `;
+
+        item.addEventListener("click", () => {
+          console.log("Open deck:", name);
+        });
+
+        item.querySelector(".edit-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          openDeckModal(true, index, name);
+        });
+
+        item.querySelector(".delete-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteDeck(index);
+        });
+
+        deckListEl.appendChild(item);
+      });
+    }
+
+    function openDeckModal(isEdit = false, index = null, name = "") {
+      editingDeckIndex = isEdit ? index : null;
+      deckModalTitle.textContent = isEdit ? "Edit Deck" : "Add Deck";
+      deckNameInput.value = name;
+      deckModal.classList.add("show");
+      deckNameInput.focus();
+    }
+
+    function closeDeckModal() {
+      deckModal.classList.remove("show");
+      deckNameInput.value = "";
+      editingDeckIndex = null;
+    }
+
+    function deleteDeck(index) {
+      const decks = loadDecks();
+      decks.splice(index, 1);
+      saveDecks(decks);
+      renderDecks();
+    }
+
+    document.getElementById("addDeckBtn").addEventListener("click", () => openDeckModal());
+
+    cancelDeckBtn.addEventListener("click", closeDeckModal);
+
+    saveDeckBtn.addEventListener("click", () => {
+      const name = deckNameInput.value.trim();
+      if (!name) return;
+
+      const decks = loadDecks();
+
+      if (editingDeckIndex === null) {
+        decks.push(name);
+      } else {
+        decks[editingDeckIndex] = name;
+      }
+
+      saveDecks(decks);
+      renderDecks();
+      closeDeckModal();
+    });
+
+    deckModal.addEventListener("click", (e) => {
+      if (e.target === deckModal) closeDeckModal();
+    });
+
+    renderDecks();
+  </script>
+
+</body>
+</html>

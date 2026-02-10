@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>MEMORA</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <link href="https://fonts.googleapis.com/css?family=Manrope:700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <!-- hover target to reveal sidebar -->
+  <div class="left-hover-target" aria-hidden="true"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+    <div class="sidebar-content">
+
+      <p class="sidebar-title">Menu</p>
+
+      <button id="createDeckBtn" class="sidebar-link" type="button">Create New Deck</button>
+
+      <div class="sidebar-section">
+        <div id="myClassesBtn" class="sidebar-heading clickable" role="button" tabindex="0">My Classes</div>
+        <button class="class-add-btn" id="openClassModalBtn" aria-label="Add class">+</button>
+      </div>
+
+      <!-- CLASS LIST (single, unique) -->
+      <div id="classList" class="class-list" aria-live="polite"></div>
+
+    </div>
+  </aside>
+
+  <!-- CLASS MODAL -->
+  <div id="classModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle">Add Class</h2>
+
+      <input id="classNameInput" class="modal-input" placeholder="Class name..." aria-label="Class name" />
+
+      <div class="modal-buttons">
+        <button id="saveClassBtn" class="modal-btn primary">Save</button>
+        <button id="cancelClassBtn" class="modal-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <main class="page-wrap" id="pageWrap">
+    <div class="site-name" id="siteName" role="button" tabindex="0">
+      <span class="material-icons lightbulb">lightbulb_outline</span>
+      Memora
+    </div>
+
+    <div class="greeting" id="greetingMessage">Ready when you are.</div>
+
+    <div class="center-container">
+      <div class="input-controls">
+        <div style="position: relative;">
+          <button class="add-btn" id="addBtn" aria-label="Open add menu">+</button>
+
+          <div class="add-menu" id="addMenu" role="menu" aria-hidden="true">
+            <div class="menu-item" data-type="file">Attach file</div>
+            <div class="menu-item" data-type="video">Add video link</div>
+            <div class="menu-item" data-type="website">Add website</div>
+          </div>
+        </div>
+
+        <div class="notes-wrapper">
+          <div id="notesBox" class="fake-textarea" contenteditable="true" placeholder="Paste your notes here..." aria-label="Notes"></div>
+        </div>
+      </div>
+
+      <button id="flashToggle" class="flash-toggle" aria-expanded="false">Flashcard Settings</button>
+      <button id="generateBtn" class="generate-btn">Generate Flashcards</button>
+
+      <div class="flashcard-panel" id="flashPanel" aria-hidden="true">
+        <label class="flash-option"><input type="checkbox" id="mcq"> Multiple Choice Flashcards</label>
+        <label class="flash-option"><input type="checkbox" id="identification"> Identification Flashcards</label>
+        <label class="flash-option"><input type="checkbox" id="truefalse"> True/False Flashcards</label>
+        <label class="flash-option" style="margin-top: 12px;">
+          Flashcard Number:
+          <input type="number" id="flashCount" value="5" min="1">
+        </label>
+      </div>
+    </div>
+  </main>
+
+  <script>
+  // wrap everything so DOM elements exist before attaching listeners
+  document.addEventListener('DOMContentLoaded', () => {
+    /* ELEMENTS */
+    const classModal = document.getElementById('classModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const classNameInput = document.getElementById('classNameInput');
+    const saveClassBtn = document.getElementById('saveClassBtn');
+    const cancelClassBtn = document.getElementById('cancelClassBtn');
+    const openClassModalBtn = document.getElementById('openClassModalBtn');
+    const classListEl = document.getElementById('classList');
+
+    const addBtn = document.getElementById('addBtn');
+    const addMenu = document.getElementById('addMenu');
+
+    const flashToggle = document.getElementById('flashToggle');
+    const flashPanel = document.getElementById('flashPanel');
+    const generateBtn = document.getElementById('generateBtn');
+
+    const createDeckBtn = document.getElementById('createDeckBtn');
+    const siteName = document.getElementById('siteName');
+    const notesBox = document.getElementById('notesBox');
+    const greeting = document.getElementById('greetingMessage');
+
+    /* STATE */
+    let editingIndex = null;
+
+    /* Utilities: storage */
+    function getClasses() {
+      return JSON.parse(localStorage.getItem('memora_classes') || '[]');
+    }
+    function saveClasses(arr) {
+      localStorage.setItem('memora_classes', JSON.stringify(arr));
+    }
+
+    /* RENDER CLASSES */
+    function renderClasses() {
+      classListEl.innerHTML = '';
+      const classes = getClasses();
+      classes.forEach((name, index) => {
+        const item = document.createElement('div');
+        item.className = 'class-list-item';
+        item.tabIndex = 0;
+        item.textContent = name;
+
+        // click to open class (store current class and go to page)
+        item.addEventListener('click', () => {
+          localStorage.setItem('memora_current_class', name);
+          window.location.href = 'myclasses.html';
+        });
+
+        // keyboard support
+        item.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            localStorage.setItem('memora_current_class', name);
+            window.location.href = 'myclasses.html';
+          }
+        });
+
+        // actions container
+        const actionWrap = document.createElement('div');
+        actionWrap.className = 'class-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'icon-btn';
+        editBtn.type = 'button';
+        editBtn.title = 'Edit';
+        editBtn.innerText = '✏️';
+        editBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          openModal(true, index, name);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'icon-btn';
+        deleteBtn.type = 'button';
+        deleteBtn.title = 'Delete';
+        deleteBtn.innerText = '🗑️';
+        deleteBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (!confirm('Delete class "' + name + '"?')) return;
+          deleteClass(index);
+        });
+
+        actionWrap.appendChild(editBtn);
+        actionWrap.appendChild(deleteBtn);
+        item.appendChild(actionWrap);
+        classListEl.appendChild(item);
+      });
+    }
+
+    /* Modal controls */
+    function openModal(isEdit = false, index = null, name = '') {
+      editingIndex = isEdit ? index : null;
+      modalTitle.textContent = isEdit ? 'Edit Class' : 'Add Class';
+      classNameInput.value = name;
+      classModal.classList.add('show');
+      classModal.setAttribute('aria-hidden', 'false');
+      setTimeout(() => classNameInput.focus(), 50);
+    }
+    function closeModal() {
+      classModal.classList.remove('show');
+      classModal.setAttribute('aria-hidden', 'true');
+      classNameInput.value = '';
+      editingIndex = null;
+    }
+
+    openClassModalBtn.addEventListener('click', () => openModal());
+
+    cancelClassBtn.addEventListener('click', closeModal);
+
+    // Save (add/edit)
+    saveClassBtn.addEventListener('click', () => {
+      const name = classNameInput.value.trim();
+      if (!name) return alert('Please enter a class name.');
+      const classes = getClasses();
+      if (editingIndex === null) {
+        classes.push(name);
+      } else {
+        classes[editingIndex] = name;
+      }
+      saveClasses(classes);
+      renderClasses();
+      closeModal();
+    });
+
+    // delete
+    function deleteClass(index) {
+      const classes = getClasses();
+      classes.splice(index, 1);
+      saveClasses(classes);
+      renderClasses();
+    }
+
+    // close modal on backdrop click
+    classModal.addEventListener('click', (e) => {
+      if (e.target === classModal) closeModal();
+    });
+
+    // load previously stored classes when page loads
+    renderClasses();
+
+    /* ADD-MENU logic */
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      addMenu.classList.toggle('open');
+      addMenu.setAttribute('aria-hidden', addMenu.classList.contains('open') ? 'false' : 'true');
+    });
+
+    // menu item clicks
+    document.querySelectorAll('.menu-item').forEach(mi => {
+      mi.addEventListener('click', (e) => {
+        const type = mi.getAttribute('data-type');
+        console.log('Menu item clicked:', type);
+        addMenu.classList.remove('open');
+      });
+    });
+
+    // close menus when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!addBtn.contains(e.target) && !addMenu.contains(e.target)) {
+        addMenu.classList.remove('open');
+      }
+      // flash panel close handled below
+    });
+
+    // flash toggle
+    flashToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = flashPanel.classList.toggle('open');
+      flashToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      flashPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    });
+
+    // click outside closes flash panel
+    document.addEventListener('click', (e) => {
+      if (!flashToggle.contains(e.target) && !flashPanel.contains(e.target)) {
+        flashPanel.classList.remove('open');
+        flashToggle.setAttribute('aria-expanded', 'false');
+        flashPanel.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    generateBtn.addEventListener('click', () => {
+      console.log('Generate clicked');
+      // Placeholder: your generation logic goes here
+      alert('Generate Flashcards clicked (placeholder)');
+    });
+
+    createDeckBtn.addEventListener('click', () => {
+      alert('Create Deck clicked (placeholder)');
+    });
+
+    siteName.addEventListener('click', () => window.location.href = 'index.html');
+
+    // notes autosave
+    notesBox.innerHTML = localStorage.getItem('memora_notes') || '';
+    notesBox.addEventListener('input', () => {
+      localStorage.setItem('memora_notes', notesBox.innerHTML);
+    });
+
+    // greeting fade-in
+    setTimeout(() => greeting.classList.add('show'), 250);
+
+    // accessibility: keyboard open modal with Enter when focus on 'My Classes'
+    const myClassesBtn = document.getElementById('myClassesBtn');
+    myClassesBtn.addEventListener('click', () => {
+      // go to classes page (user asked earlier) - storing current class not required until click a class item
+      window.location.href = 'myclasses.html';
+    });
+    myClassesBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') myClassesBtn.click();
+    });
+
+  }); // DOMContentLoaded
+  </script>
+</body>
+</html>
